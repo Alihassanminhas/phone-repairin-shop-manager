@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch --experimental-strip-types src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node dist/test/auth.test.js",
     "db:generate": "prisma generate",
