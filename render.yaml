@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: mobile-repair-shop-api
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: corepack pnpm install --frozen-lockfile && corepack pnpm build:api
+    startCommand: corepack pnpm --filter @repair-shop/api start
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: CORS_ORIGINS
+        value: ""
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: RATE_LIMIT_HASH_SECRET
+        sync: false
+      - key: BOOTSTRAP_CODE
+        sync: false
