@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DashboardSummary, InvoiceRecord, MonthlyPaymentRecord, NewRepairInput, PaymentRecord, RepairDetails, RepairListItem, RepairStatus } from '@/features/repairs/types';
 import { enqueueSyncOperation } from '@/database/outbox';
+import { withEncryptedExclusiveTransaction } from '@/database/encrypted-transaction';
 
 function timestamp(): string {
   return new Date().toISOString();
@@ -51,7 +52,7 @@ export async function createRepair(
   const createdAt = now.toISOString();
   const receiptNumber = makeReceiptCode(now, id);
 
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
     const phoneKey = normalizePhone(customerPhone);
     const existingCustomer = await transaction.getFirstAsync<{ id: string }>(
       `SELECT id FROM customers WHERE archived_at IS NULL AND
@@ -211,7 +212,7 @@ export async function addPayment(
 ): Promise<void> {
   if (!Number.isSafeInteger(amountPaisa) || amountPaisa <= 0) throw new Error('Payment must be a positive amount.');
   const paidAt = timestamp();
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
     const repair = await transaction.getFirstAsync<{ finalCostPaisa: number | null; paidPaisa: number }>(
       `SELECT r.final_cost_paisa AS finalCostPaisa,
         COALESCE(SUM(CASE WHEN p.voided_at IS NULL THEN p.amount_paisa - COALESCE(rv.reversed_paisa, 0) ELSE 0 END), 0) AS paidPaisa
@@ -243,7 +244,7 @@ export async function reversePayment(database: SQLiteDatabase, paymentId: string
   const reversedAt = timestamp();
   const id = Crypto.randomUUID();
   const idempotencyKey = Crypto.randomUUID();
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
     const payment = await transaction.getFirstAsync<{ repairId: string; amountPaisa: number; reversedPaisa: number }>(
       `SELECT p.repair_id AS repairId, p.amount_paisa AS amountPaisa, COALESCE(SUM(rv.amount_paisa), 0) AS reversedPaisa
        FROM payments p LEFT JOIN payment_reversals rv ON rv.payment_id = p.id WHERE p.id = ? GROUP BY p.id`, paymentId,
@@ -262,7 +263,7 @@ export async function reversePayment(database: SQLiteDatabase, paymentId: string
 /** Updates the final bill only while it can still be reconciled with payments and invoices. */
 export async function setFinalCost(database: SQLiteDatabase, repairId: string, amountPaisa: number): Promise<void> {
   if (!Number.isSafeInteger(amountPaisa) || amountPaisa < 0) throw new Error('Enter a valid non-negative final cost.');
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
     const record = await transaction.getFirstAsync<{ paidPaisa: number; invoiceId: string | null; version: number }>(
       `SELECT COALESCE(SUM(CASE WHEN p.voided_at IS NULL THEN p.amount_paisa - COALESCE(rv.reversed_paisa, 0) ELSE 0 END), 0) AS paidPaisa,
         i.id AS invoiceId, r.version AS version FROM repairs r LEFT JOIN payments p ON p.repair_id = r.id
@@ -297,7 +298,7 @@ export async function changeRepairStatus(
   repairId: string,
   nextStatus: RepairStatus,
 ): Promise<void> {
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
     const current = await transaction.getFirstAsync<{ status: RepairStatus; version: number }>(
       'SELECT status, version FROM repairs WHERE id = ?', repairId,
     );
@@ -363,7 +364,7 @@ export async function getDashboardSummary(database: SQLiteDatabase): Promise<Das
 
 export async function issueInvoice(database: SQLiteDatabase, repairId: string): Promise<InvoiceRecord> {
   let issuedInvoice: InvoiceRecord | null = null;
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
   const existing = await transaction.getFirstAsync<{
     invoiceCode: string;
     issuedAt: string;

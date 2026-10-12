@@ -32,7 +32,7 @@ async function authRequest(path: string, body: Record<string, unknown>): Promise
   }
   const result: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(extractMessage(result) ?? 'Owner sign-in failed. Please try again.');
+    throw new Error(extractMessage(result) ?? authFailureMessage(response.status));
   }
   if (typeof result !== 'object' || result === null || !('accessToken' in result) || !('refreshToken' in result) || !('owner' in result)) {
     throw new Error('The server returned an invalid sign-in response.');
@@ -43,6 +43,13 @@ async function authRequest(path: string, body: Record<string, unknown>): Promise
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, session.refreshToken);
   await SecureStore.setItemAsync(OWNER_KEY, JSON.stringify(session.owner));
   return session;
+}
+
+function authFailureMessage(status: number): string {
+  if (status === 401) return 'Email or password was not accepted. If this is the first setup, create the owner account first.';
+  if (status === 404) return 'The shop API URL or authentication endpoint was not found. Check EXPO_PUBLIC_API_URL in the EAS preview environment.';
+  if (status >= 500) return 'The shop server returned an error. Check its /health/ready endpoint and Render logs.';
+  return `The shop server rejected the request (HTTP ${status}). Check the account details and server configuration.`;
 }
 
 export async function signInOwner(email: string, password: string): Promise<OwnerSession> {

@@ -13,6 +13,10 @@
     "android": {
       "package": "com.mobilerepair.manager",
       "allowBackup": false,
+      "androidStatusBar": {
+        "barStyle": "dark-content",
+        "backgroundColor": "#F5F3EE"
+      },
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

@@ -3,12 +3,13 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 const DATABASE_VERSION = 5;
+export const DATABASE_KEY_STORAGE_KEY = 'repair_manager_database_key';
 
 /** Creates and upgrades the on-device schema before any screen reads data. */
 export async function migrateDatabase(database: SQLiteDatabase): Promise<void> {
-  const storedKey = await SecureStore.getItemAsync('repair_manager_database_key');
+  const storedKey = await SecureStore.getItemAsync(DATABASE_KEY_STORAGE_KEY);
   const databaseKey = storedKey ?? bytesToHex(await Crypto.getRandomBytesAsync(32));
-  if (!storedKey) await SecureStore.setItemAsync('repair_manager_database_key', databaseKey);
+  if (!storedKey) await SecureStore.setItemAsync(DATABASE_KEY_STORAGE_KEY, databaseKey);
 
   // The key is generated as lowercase hex, so it cannot alter the PRAGMA statement.
   await database.execAsync(`PRAGMA key = '${databaseKey}';`);

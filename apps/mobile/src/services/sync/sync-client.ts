@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
+import { withEncryptedExclusiveTransaction } from '@/database/encrypted-transaction';
 import { isAllowedTransition, type RepairStatus } from '@repair-shop/shared';
 
 import { getPendingOutbox, getSyncClientId, markOutboxApplied, markOutboxConflict, markOutboxFailure } from '@/database/outbox';
@@ -35,7 +36,7 @@ export async function resolveSyncConflict(database: SQLiteDatabase, conflictId: 
     const repairId = entityType === 'repair' ? row.entity_id
       : (entityType === 'repair_status_history' || entityType === 'invoice' || entityType === 'payment' || entityType === 'payment_reversal') && typeof payload.repairId === 'string' ? payload.repairId
         : null;
-    await database.withExclusiveTransactionAsync(async (transaction) => {
+    await withEncryptedExclusiveTransaction(database, async (transaction) => {
       await transaction.runAsync("UPDATE outbox SET sync_state = 'local_only' WHERE id = ?", conflictId);
       if (entityType === 'customer') await transaction.runAsync("UPDATE customers SET sync_state = 'local' WHERE id = ?", row.entity_id);
       else if (entityType === 'repair') await transaction.runAsync("UPDATE repairs SET sync_state = 'local' WHERE id = ?", row.entity_id);
@@ -51,7 +52,7 @@ export async function resolveSyncConflict(database: SQLiteDatabase, conflictId: 
     if (!snapshot || !['customer', 'repair', 'repair_status_history'].includes(entityType)) throw new Error('This conflict cannot safely use the server snapshot automatically.');
     const repairId = entityType === 'repair_status_history' ? requiredText(payload, 'repairId') : row.entity_id;
     if (entityType !== 'customer') await ensureNoRelatedOperations(database, conflictId, repairId);
-    await database.withExclusiveTransactionAsync(async (transaction) => {
+    await withEncryptedExclusiveTransaction(database, async (transaction) => {
       if (entityType === 'customer') await applyRemoteCustomer(transaction, snapshot, true);
       else {
         await applyRemoteRepair(transaction, snapshot, true);
@@ -76,7 +77,7 @@ export async function resolveSyncConflict(database: SQLiteDatabase, conflictId: 
     throw new Error('This financial or invoice conflict needs manual review and cannot be rebased automatically.');
   }
   const nextOperationId = Crypto.randomUUID();
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  await withEncryptedExclusiveTransaction(database, async (transaction) => {
     await transaction.runAsync(`UPDATE outbox SET id = ?, base_version = ?, payload_json = ?, sync_state = 'pending', attempts = 0, last_error = NULL WHERE id = ?`, nextOperationId, serverVersion, JSON.stringify(nextPayload), conflictId);
     if (entityType === 'customer' && serverVersion !== null) await transaction.runAsync("UPDATE customers SET version = ?, sync_state = 'local' WHERE id = ?", serverVersion + 1, row.entity_id);
     if (relatedRepairId && serverVersion !== null) await transaction.runAsync("UPDATE repairs SET version = ?, sync_state = 'local' WHERE id = ?", serverVersion + 1, relatedRepairId);
@@ -170,7 +171,7 @@ async function pullRemoteChanges(database: SQLiteDatabase): Promise<void> {
     for (const key of ['customers', 'repairs', 'payments', 'reversals', 'invoices', 'statusHistory'] as const) {
       if (!Array.isArray(changes[key]) || changes[key].some((item) => !isObject(item))) throw new Error('The server returned invalid shop records.');
     }
-    await database.withExclusiveTransactionAsync(async (transaction) => {
+    await withEncryptedExclusiveTransaction(database, async (transaction) => {
       for (const row of changes.customers) await applyRemoteCustomer(transaction, row);
       for (const row of changes.repairs) await applyRemoteRepair(transaction, row);
       for (const row of changes.payments) await applyRemotePayment(transaction, row);

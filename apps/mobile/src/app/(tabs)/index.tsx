@@ -1,4 +1,4 @@
-import { Link, useFocusEffect } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -65,16 +65,19 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <Link href="/repairs/new" asChild>
-          <Pressable accessibilityRole="button" style={({ pressed }) => [styles.receiveButton, pressed && styles.pressed]}>
-            <Text style={styles.receivePlus}>＋</Text>
-            <View>
-              <Text style={styles.receiveTitle}>Receive a phone</Text>
-              <Text style={styles.receiveSubtitle}>Start a new repair record</Text>
-            </View>
-            <Text style={styles.receiveArrow}>›</Text>
-          </Pressable>
-        </Link>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint="Opens a new repair record"
+          onPress={() => router.push('/repairs/new')}
+          style={({ pressed }) => [styles.receiveButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.receivePlus}>＋</Text>
+          <View>
+            <Text style={styles.receiveTitle}>Receive a phone</Text>
+            <Text style={styles.receiveSubtitle}>Start a new repair record</Text>
+          </View>
+          <Text style={styles.receiveArrow}>›</Text>
+        </Pressable>
 
         <View style={styles.sectionHeading}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>Shop floor</Text>

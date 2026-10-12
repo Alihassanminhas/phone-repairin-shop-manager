@@ -9,6 +9,7 @@ import {
 import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 import { SQLiteProvider } from 'expo-sqlite';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -47,6 +48,7 @@ export default function RootLayout() {
           await SplashScreen.hideAsync();
         }
       }}>
+        <StatusBar style="dark" />
         <Stack screenOptions={{ contentStyle: { backgroundColor: Colors.light.background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="repairs/new" options={{ title: 'Receive phone', presentation: 'modal' }} />
