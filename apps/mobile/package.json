@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@repair-shop/shared": "workspace:*",
     "@expo-google-fonts/dm-sans": "0.4.2",
     "@expo-google-fonts/ibm-plex-mono": "0.4.1",
     "@expo/ui": "~57.0.22",
@@ -42,6 +43,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "eas-build-post-install": "corepack pnpm --filter @repair-shop/shared build",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",

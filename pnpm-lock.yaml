@@ -60,6 +60,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@repair-shop/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@expo-google-fonts/dm-sans':
         specifier: 0.4.2
         version: 0.4.2
