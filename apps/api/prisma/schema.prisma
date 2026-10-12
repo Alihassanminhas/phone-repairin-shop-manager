@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RepairStatus {
+  received
+  diagnosing
+  awaiting_approval
+  waiting_for_parts
+  in_repair
+  ready
+  delivered
+  cancelled
+}
+
+enum PaymentMethod {
+  cash
+  bank_transfer
+  other
+}
+
+model Owner {
+  id               String                @id @default(uuid()) @db.Uuid
+  singleton        Int                   @unique @default(1)
+  email            String                @unique @db.VarChar(254)
+  passwordHash     String                @db.VarChar(200)
+  recoveryCodeHash String                @db.VarChar(64)
+  shopName         String                @db.VarChar(120)
+  shopTimezone     String                @default("Asia/Karachi") @db.VarChar(80)
+  tokenVersion     Int                   @default(0)
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @db.Timestamptz(3)
+  sessions         RefreshSession[]
+  customers        Customer[]
+  repairs          Repair[]
+  payments         Payment[]
+  reversals        PaymentReversal[]
+  invoices         Invoice[]
+  statusHistory    RepairStatusHistory[]
+  syncOperations   SyncOperation[]
+  auditEvents      AuditEvent[]
+}
+
+model RefreshSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  ownerId        String    @db.Uuid
+  familyId       String    @db.Uuid
+  deviceId       String    @db.Uuid
+  tokenHash      String    @unique @db.VarChar(64)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt      DateTime  @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+  replacedByHash String?   @db.VarChar(64)
+  owner          Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, revokedAt, expiresAt])
+  @@index([familyId, revokedAt])
+}
+
+model Customer {
+  id             String    @id @default(uuid()) @db.Uuid
+  ownerId        String    @db.Uuid
+  name           String    @db.VarChar(120)
+  phone          String    @db.VarChar(32)
+  alternatePhone String?   @db.VarChar(32)
+  address        String?   @db.VarChar(500)
+  notes          String?   @db.VarChar(2000)
+  version        Int       @default(1)
+  archivedAt     DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+  owner          Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repairs        Repair[]
+
+  @@unique([id, ownerId])
+  @@index([ownerId, name])
+  @@index([ownerId, phone])
+  @@index([ownerId, updatedAt])
+}
+
+model Repair {
+  id                   String                @id @default(uuid()) @db.Uuid
+  ownerId              String                @db.Uuid
+  customerId           String                @db.Uuid
+  receiptNumber        String                @db.VarChar(48)
+  brand                String                @db.VarChar(80)
+  model                String                @db.VarChar(120)
+  imei                 String?               @db.VarChar(16)
+  reportedProblem      String                @db.VarChar(2000)
+  inspectionNotes      String?               @db.VarChar(4000)
+  accessories          String?               @db.VarChar(500)
+  receivedAt           DateTime              @default(now()) @db.Timestamptz(3)
+  expectedDeliveryDate DateTime?             @db.Date
+  deliveredAt          DateTime?             @db.Timestamptz(3)
+  status               RepairStatus          @default(received)
+  estimatedCostPaisa   BigInt?
+  finalCostPaisa       BigInt?
+  internalNotes        String?               @db.VarChar(4000)
+  version              Int                   @default(1)
+  archivedAt           DateTime?             @db.Timestamptz(3)
+  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime              @updatedAt @db.Timestamptz(3)
+  owner                Owner                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customer             Customer              @relation(fields: [customerId, ownerId], references: [id, ownerId], onDelete: Restrict)
+  payments             Payment[]
+  reversals            PaymentReversal[]
+  invoice              Invoice?
+  statusHistory        RepairStatusHistory[]
+
+  @@unique([id, ownerId])
+  @@unique([ownerId, receiptNumber])
+  @@index([ownerId, status, receivedAt])
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, expectedDeliveryDate])
+}
+
+model Payment {
+  id                   String            @id @default(uuid()) @db.Uuid
+  ownerId              String            @db.Uuid
+  repairId             String            @db.Uuid
+  amountPaisa          BigInt
+  method               PaymentMethod
+  transactionReference String?           @db.VarChar(160)
+  note                 String?           @db.VarChar(500)
+  idempotencyKey       String            @db.Uuid
+  requestHash          String            @db.VarChar(64)
+  paidAt               DateTime          @default(now()) @db.Timestamptz(3)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  owner                Owner             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repair               Repair            @relation(fields: [repairId, ownerId], references: [id, ownerId], onDelete: Restrict)
+  reversals            PaymentReversal[]
+
+  @@unique([ownerId, idempotencyKey])
+  @@unique([id, ownerId])
+  @@index([ownerId, paidAt])
+  @@index([repairId, paidAt])
+}
+
+model PaymentReversal {
+  id             String   @id @default(uuid()) @db.Uuid
+  ownerId        String   @db.Uuid
+  repairId       String   @db.Uuid
+  paymentId      String   @db.Uuid
+  amountPaisa    BigInt
+  reason         String   @db.VarChar(500)
+  idempotencyKey String   @db.Uuid
+  requestHash    String   @db.VarChar(64)
+  reversedAt     DateTime @default(now()) @db.Timestamptz(3)
+  owner          Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repair         Repair   @relation(fields: [repairId, ownerId], references: [id, ownerId], onDelete: Restrict)
+  payment        Payment  @relation(fields: [paymentId, ownerId], references: [id, ownerId], onDelete: Restrict)
+
+  @@unique([ownerId, idempotencyKey])
+  @@index([paymentId, reversedAt])
+}
+
+model Invoice {
+  id                        String   @id @default(uuid()) @db.Uuid
+  ownerId                   String   @db.Uuid
+  repairId                  String   @unique @db.Uuid
+  invoiceCode               String   @db.VarChar(48)
+  issuedAt                  DateTime @default(now()) @db.Timestamptz(3)
+  createdAt                 DateTime @default(now()) @db.Timestamptz(3)
+  customerNameSnapshot      String   @db.VarChar(120)
+  customerPhoneSnapshot     String   @db.VarChar(32)
+  repairDescriptionSnapshot String   @db.VarChar(2400)
+  totalPaisa                BigInt
+  paidPaisa                 BigInt
+  balancePaisa              BigInt
+  owner                     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repair                    Repair   @relation(fields: [repairId, ownerId], references: [id, ownerId], onDelete: Restrict)
+
+  @@unique([ownerId, invoiceCode])
+  @@unique([repairId, ownerId])
+  @@index([ownerId, issuedAt])
+  @@index([ownerId, createdAt])
+}
+
+model RepairStatusHistory {
+  id         String        @id @default(uuid()) @db.Uuid
+  ownerId    String        @db.Uuid
+  repairId   String        @db.Uuid
+  fromStatus RepairStatus?
+  toStatus   RepairStatus
+  note       String?       @db.VarChar(500)
+  changedAt  DateTime      @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+  owner      Owner         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  repair     Repair        @relation(fields: [repairId, ownerId], references: [id, ownerId], onDelete: Restrict)
+
+  @@index([repairId, changedAt])
+  @@index([ownerId, createdAt])
+}
+
+model SyncOperation {
+  id            String   @id @default(uuid()) @db.Uuid
+  ownerId       String   @db.Uuid
+  operationId   String   @db.Uuid
+  clientId      String   @db.Uuid
+  entityType    String   @db.VarChar(40)
+  entityId      String   @db.Uuid
+  resultVersion Int?
+  resultJson    Json?
+  processedAt   DateTime @default(now()) @db.Timestamptz(3)
+  owner         Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, operationId])
+  @@index([ownerId, processedAt])
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @db.Uuid
+  eventType String   @db.VarChar(80)
+  subjectId String?  @db.Uuid
+  metadata  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, createdAt])
+}
+
+model AuthRateLimit {
+  bucketKey   String   @id @db.VarChar(64)
+  hitCount    Int      @default(0)
+  windowStart DateTime @db.Timestamptz(3)
+  expiresAt   DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}

@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+permissions:
+  dotenv:
+    skills: false
+verifyDepsBeforeRun: false

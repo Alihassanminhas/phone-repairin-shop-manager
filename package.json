@@ -1,0 +1,17 @@
+{
+  "name": "mobile-repair-shop-manager",
+  "private": true,
+  "scripts": {
+    "start": "corepack pnpm --filter @repair-shop/mobile start",
+    "dev:api": "corepack pnpm --filter @repair-shop/api dev",
+    "typecheck": "corepack pnpm --filter @repair-shop/mobile typecheck",
+    "typecheck:all": "corepack pnpm --filter @repair-shop/shared typecheck && corepack pnpm --filter @repair-shop/api typecheck && corepack pnpm --filter @repair-shop/mobile typecheck",
+    "build:api": "corepack pnpm --filter @repair-shop/shared build && corepack pnpm --filter @repair-shop/api build",
+    "test": "corepack pnpm --filter @repair-shop/shared test && corepack pnpm --filter @repair-shop/shared build && corepack pnpm --filter @repair-shop/api build && corepack pnpm --filter @repair-shop/api test",
+    "android:bundle": "corepack pnpm --filter @repair-shop/mobile android:bundle"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "6.0.3"
+  }
+}
